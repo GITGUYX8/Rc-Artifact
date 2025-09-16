@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer } = require('electron');
 const { exec } = require('child_process');
 const path = require('path');
 
@@ -24,6 +24,10 @@ ipcMain.on('launch-scrcpy', (event, phoneIP) => {
     }
     console.log(stdout);
   });
+});
+
+ipcMain.handle('get-screen-sources', async () => {
+  return await desktopCapturer.getSources({ types: ['window', 'screen'] });
 });
 
 app.whenReady().then(createWindow);

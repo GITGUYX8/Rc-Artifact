@@ -3,21 +3,38 @@
 <head>
   <title>Robot + AR Dashboard</title>
   <style>
-    body { display: flex; margin: 0; height: 100vh; font-family: Arial; }
-    #video { flex: 2; background: #000; display: flex; justify-content: center; align-items: center; color: white; }
-    #controls { flex: 1; padding: 20px; background: #f4f4f4; }
-    input, button { margin: 5px; padding: 8px; }
-    button { cursor: pointer; }
+    body { display: flex; margin: 0; height: 100vh; font-family: Arial, sans-serif; }
+    #video { flex: 2; background: #000; display: flex; justify-content: center; align-items: center; color: white; position: relative; }
+    #controls { flex: 1; padding: 20px; background: #f4f4f4; overflow-y: auto; }
+    input, button { margin: 5px 0; padding: 8px; width: calc(100% - 18px); box-sizing: border-box; }
+    button { cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px; }
+    button:hover { background-color: #0056b3; }
+    h2 { margin-top: 20px; }
+    #screen-select-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
+    #screen-select-content { background: white; padding: 20px; border-radius: 8px; max-height: 80%; overflow-y: auto; }
+    .source-item { display: flex; align-items: center; cursor: pointer; padding: 10px; border-bottom: 1px solid #eee; }
+    .source-item:hover { background: #f0f0f0; }
+    .source-item img { width: 100px; height: auto; margin-right: 15px; }
+    .source-item span { font-size: 14px; }
   </style>
 </head>
 <body>
-  <div id="video">
-    <p>Phone feed will open in a separate window (scrcpy)</p>
+  <div id="screen-select-modal">
+    <div id="screen-select-content"><h2>Select a Screen or Window to Share</h2></div>
   </div>
+  <div id="video"></div>
   <div id="controls">
     <h2>Connection</h2>
     <input id="phoneIP" placeholder="Phone IP (e.g. 192.168.0.107)" />
     <button onclick="startScrcpy()">Launch Scrcpy</button>
+    <br>
+    <input id="streamURL" placeholder="Stream URL (e.g. http://192.168.0.108:8080/video)" />
+    <button onclick="startStream()">Start Stream</button>
+    <br>
+    <input id="websiteURL" placeholder="Website URL (e.g. https://google.com)" />
+    <button onclick="loadWebsite()">Load Website</button>
+    <br>
+    <button onclick="showScreenSources()">Share Screen</button>
     <br>
     <input id="espIP" placeholder="ESP32 IP (e.g. 192.168.4.1)" />
     <button onclick="connectESP()">Connect ESP32</button>
@@ -36,6 +53,60 @@ function startScrcpy() {
     window.electronAPI.launchScrcpy(ip);
     alert("Scrcpy launched for " + ip);
   }
+}
+
+function startStream() {
+  const url = document.getElementById("streamURL").value;
+  if (url) {
+    const videoDiv = document.getElementById('video');
+    // Using an <img> tag is common for MJPEG streams
+    videoDiv.innerHTML = `<img src="${url}" style="width: 100%; height: 100%; object-fit: contain;" alt="Video Stream">`;
+  }
+}
+
+function loadWebsite() {
+  const url = document.getElementById("websiteURL").value;
+  if (url) {
+    const videoDiv = document.getElementById('video');
+    videoDiv.innerHTML = `<iframe src="${url}" style="width: 100%; height: 100%; border: none;" title="Website View"></iframe>`;
+  }
+}
+
+async function showScreenSources() {
+  const modal = document.getElementById('screen-select-modal');
+  const content = document.getElementById('screen-select-content');
+  content.innerHTML = '<h2>Select a Screen or Window to Share</h2>'; // Reset content
+
+  // This function needs to be exposed from your preload script
+  const sources = await window.electronAPI.getScreenSources();
+
+  sources.forEach(source => {
+    const item = document.createElement('div');
+    item.className = 'source-item';
+    item.onclick = () => selectScreenSource(source);
+
+    const thumbnail = document.createElement('img');
+    thumbnail.src = source.thumbnail.toDataURL();
+    item.appendChild(thumbnail);
+
+    const name = document.createElement('span');
+    name.textContent = source.name;
+    item.appendChild(name);
+
+    content.appendChild(item);
+  });
+
+  modal.style.display = 'flex';
+}
+
+async function selectScreenSource(source) {
+  document.getElementById('screen-select-modal').style.display = 'none';
+  const videoDiv = document.getElementById('video');
+  videoDiv.innerHTML = `<video autoplay style="width: 100%; height: 100%;"></video>`;
+  const videoElement = videoDiv.querySelector('video');
+
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: source.id } } });
+  videoElement.srcObject = stream;
 }
 
 function connectESP() {
