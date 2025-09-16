@@ -1,0 +1,16 @@
+{
+  "name": "robot-dashboard",
+  "version": "1.0.0",
+  "description": "ESP32 Robot + Phone feed dashboard",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "jsmpeg-player": "^3.0.3",
+    "node-rtsp-stream": "^0.0.9"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0"
+  }
+}

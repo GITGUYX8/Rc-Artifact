@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Robot + AR Dashboard</title>
+  <style>
+    body { display: flex; margin: 0; height: 100vh; font-family: Arial; }
+    #video { flex: 2; background: #000; display: flex; justify-content: center; align-items: center; color: white; }
+    #controls { flex: 1; padding: 20px; background: #f4f4f4; }
+    input, button { margin: 5px; padding: 8px; }
+    button { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="video">
+    <p>Phone feed will open in a separate window (scrcpy)</p>
+  </div>
+  <div id="controls">
+    <h2>Connection</h2>
+    <input id="phoneIP" placeholder="Phone IP (e.g. 192.168.0.107)" />
+    <button onclick="startScrcpy()">Launch Scrcpy</button>
+    <br>
+    <input id="espIP" placeholder="ESP32 IP (e.g. 192.168.4.1)" />
+    <button onclick="connectESP()">Connect ESP32</button>
+
+    <h2>Controls</h2>
+    <p>Use WASD keys to control the robot and Spacebar to stop.</p>
+    <div id="buttons"></div>
+  </div>
+
+<script>
+let ws;
+
+function startScrcpy() {
+  let ip = document.getElementById("phoneIP").value;
+  if (ip) {
+    window.electronAPI.launchScrcpy(ip);
+    alert("Scrcpy launched for " + ip);
+  }
+}
+
+function connectESP() {
+  let ip = document.getElementById("espIP").value;
+  if (!ip) return alert("Enter ESP32 IP!");
+  ws = new WebSocket("ws://" + ip + ":81/");   // FIXED
+  ws.onopen = () => alert("Connected to ESP32!");
+  document.getElementById("buttons").innerHTML = `
+    <button onclick="send('forward')">Forward</button>
+    <button onclick="send('backward')">Backward</button><br>
+    <button onclick="send('left')">Left</button>
+    <button onclick="send('right')">Right</button><br>
+    <button onclick="send('stop')">Stop</button>
+  `;
+
+  document.addEventListener('keydown', (event) => {
+    // Ignore repeated events from holding a key down
+    if (event.repeat) return;
+
+    switch (event.key.toLowerCase()) {
+      case 'w': send('forward'); break;
+      case 'a': send('left'); break;
+      case 's': send('backward'); break;
+      case 'd': send('right'); break;
+      case ' ': send('stop'); break;
+    }
+  });
+
+  document.addEventListener('keyup', (event) => {
+    switch (event.key.toLowerCase()) {
+      case 'w':
+      case 'a':
+      case 's':
+      case 'd':
+        send('stop');
+        break;
+    }
+  });
+}
+
+function send(cmd) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ motor: "robot", command: cmd, pwm: 215 }));
+  }
+}
+</script>
+</body>
+</html>
