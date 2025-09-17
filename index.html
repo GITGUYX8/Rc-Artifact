@@ -3,19 +3,54 @@
 <head>
   <title>Robot + AR Dashboard</title>
   <style>
-    body { display: flex; margin: 0; height: 100vh; font-family: Arial, sans-serif; }
-    #video { flex: 2; background: #000; display: flex; justify-content: center; align-items: center; color: white; position: relative; }
-    #controls { flex: 1; padding: 20px; background: #f4f4f4; overflow-y: auto; }
+    :root {
+      --dark-bg: #1a1a1d;
+      --panel-bg: #2c2c34;
+      --text-color: #c5c6c7;
+      --primary-color: #66fcf1;
+      --secondary-color: #45a29e;
+      --border-color: #4f545c;
+    }
+    body {
+      display: flex;
+      margin: 0;
+      height: 100vh;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--dark-bg);
+      color: var(--text-color);
+    }
+    #video { flex: 3; background: #000; display: flex; justify-content: center; align-items: center; position: relative; border-right: 2px solid var(--border-color); }
+    #controls { flex: 1; padding: 20px; background: var(--panel-bg); overflow-y: auto; }
     input, button { margin: 5px 0; padding: 8px; width: calc(100% - 18px); box-sizing: border-box; }
-    button { cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px; }
-    button:hover { background-color: #0056b3; }
-    h2 { margin-top: 20px; }
-    #screen-select-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
-    #screen-select-content { background: white; padding: 20px; border-radius: 8px; max-height: 80%; overflow-y: auto; }
-    .source-item { display: flex; align-items: center; cursor: pointer; padding: 10px; border-bottom: 1px solid #eee; }
-    .source-item:hover { background: #f0f0f0; }
+    input { background-color: var(--dark-bg); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px; padding: 10px; }
+    input:focus { outline: none; border-color: var(--primary-color); }
+    button {
+      cursor: pointer;
+      background: linear-gradient(145deg, var(--secondary-color), var(--primary-color));
+      color: var(--dark-bg);
+      font-weight: bold;
+      border: none;
+      border-radius: 5px;
+      padding: 12px;
+      transition: transform 0.1s ease, box-shadow 0.2s ease;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    button:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+    button:active { transform: translateY(1px); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    h2 { margin-top: 20px; color: var(--primary-color); border-bottom: 1px solid var(--border-color); padding-bottom: 5px; }
+    #screen-select-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
+    #screen-select-content { background: var(--panel-bg); color: var(--text-color); padding: 20px; border-radius: 8px; max-height: 80%; overflow-y: auto; border: 1px solid var(--primary-color); }
+    .source-item { display: flex; align-items: center; cursor: pointer; padding: 10px; border-bottom: 1px solid var(--border-color); transition: background-color 0.2s; }
+    .source-item:hover { background-color: var(--secondary-color); color: var(--dark-bg); }
     .source-item img { width: 100px; height: auto; margin-right: 15px; }
     .source-item span { font-size: 14px; }
+    #d-pad-container { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 10px; max-width: 200px; margin: 20px auto; }
+    #d-pad-container button { width: 100%; height: 50px; padding: 0; }
+    #btn-forward { grid-column: 2; grid-row: 1; }
+    #btn-left { grid-column: 1; grid-row: 2; }
+    #btn-stop { grid-column: 2; grid-row: 2; background: linear-gradient(145deg, #c33, #f66); }
+    #btn-right { grid-column: 3; grid-row: 2; }
+    #btn-backward { grid-column: 2; grid-row: 3; }
   </style>
 </head>
 <body>
@@ -28,12 +63,6 @@
     <input id="phoneIP" placeholder="Phone IP (e.g. 192.168.0.107)" />
     <button onclick="startScrcpy()">Launch Scrcpy</button>
     <br>
-    <input id="streamURL" placeholder="Stream URL (e.g. http://192.168.0.108:8080/video)" />
-    <button onclick="startStream()">Start Stream</button>
-    <br>
-    <input id="websiteURL" placeholder="Website URL (e.g. https://google.com)" />
-    <button onclick="loadWebsite()">Load Website</button>
-    <br>
     <button onclick="showScreenSources()">Share Screen</button>
     <br>
     <input id="espIP" placeholder="ESP32 IP (e.g. 192.168.4.1)" />
@@ -41,7 +70,13 @@
 
     <h2>Controls</h2>
     <p>Use WASD keys to control the robot and Spacebar to stop.</p>
-    <div id="buttons"></div>
+    <div id="d-pad-container">
+      <button id="btn-forward" onclick="send('forward')">▲</button>
+      <button id="btn-left" onclick="send('left')">◀</button>
+      <button id="btn-stop" onclick="send('stop')">🛑</button>
+      <button id="btn-right" onclick="send('right')">▶</button>
+      <button id="btn-backward" onclick="send('backward')">▼</button>
+    </div>
   </div>
 
 <script>
@@ -52,23 +87,6 @@ function startScrcpy() {
   if (ip) {
     window.electronAPI.launchScrcpy(ip);
     alert("Scrcpy launched for " + ip);
-  }
-}
-
-function startStream() {
-  const url = document.getElementById("streamURL").value;
-  if (url) {
-    const videoDiv = document.getElementById('video');
-    // Using an <img> tag is common for MJPEG streams
-    videoDiv.innerHTML = `<img src="${url}" style="width: 100%; height: 100%; object-fit: contain;" alt="Video Stream">`;
-  }
-}
-
-function loadWebsite() {
-  const url = document.getElementById("websiteURL").value;
-  if (url) {
-    const videoDiv = document.getElementById('video');
-    videoDiv.innerHTML = `<iframe src="${url}" style="width: 100%; height: 100%; border: none;" title="Website View"></iframe>`;
   }
 }
 
@@ -110,48 +128,65 @@ async function selectScreenSource(source) {
 }
 
 function connectESP() {
-  let ip = document.getElementById("espIP").value;
-  if (!ip) return alert("Enter ESP32 IP!");
-  ws = new WebSocket("ws://" + ip + ":81/");   // FIXED
-  ws.onopen = () => alert("Connected to ESP32!");
-  document.getElementById("buttons").innerHTML = `
-    <button onclick="send('forward')">Forward</button>
-    <button onclick="send('backward')">Backward</button><br>
-    <button onclick="send('left')">Left</button>
-    <button onclick="send('right')">Right</button><br>
-    <button onclick="send('stop')">Stop</button>
-  `;
+  const ip = document.getElementById("espIP").value;
+  if (!ip) {
+    return alert("Enter ESP32 IP!");
+  }
 
-  document.addEventListener('keydown', (event) => {
-    // Ignore repeated events from holding a key down
-    if (event.repeat) return;
+  // Prevent creating new connection if already connected or connecting
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+    console.log("WebSocket is already open or connecting.");
+    return;
+  }
 
-    switch (event.key.toLowerCase()) {
-      case 'w': send('forward'); break;
-      case 'a': send('left'); break;
-      case 's': send('backward'); break;
-      case 'd': send('right'); break;
-      case ' ': send('stop'); break;
-    }
-  });
+  console.log(`Attempting to connect to ESP32 at ws://${ip}:81/`);
+  ws = new WebSocket(`ws://${ip}:81/`);
 
-  document.addEventListener('keyup', (event) => {
-    switch (event.key.toLowerCase()) {
-      case 'w':
-      case 'a':
-      case 's':
-      case 'd':
-        send('stop');
-        break;
-    }
-  });
+  ws.onopen = () => {
+    console.log("Connected to ESP32!");
+  };
+
+  ws.onclose = (event) => {
+    console.log("WebSocket disconnected. Reconnecting in 2 seconds...");
+    // Clear the ws variable to allow a new connection attempt
+    ws = null; 
+    setTimeout(connectESP, 2000);
+  };
+
+  ws.onerror = (error) => {
+    console.error("WebSocket error:", error.message);
+    // The onclose event will be called automatically after an error,
+    // which will trigger the reconnection logic.
+  };
 }
 
 function send(cmd) {
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ motor: "robot", command: cmd, pwm: 215 }));
+    ws.send(JSON.stringify({ motor: "robot", command: cmd, pwm: 150 }));
   }
 }
+
+// Setup keyboard listeners once when the script loads
+document.addEventListener('keydown', (event) => {
+  // Ignore repeated events from holding a key down
+  if (event.repeat) return;
+
+  switch (event.key.toLowerCase()) {
+    case 'w': send('forward'); break;
+    case 'a': send('left'); break;
+    case 's': send('backward'); break;
+    case 'd': send('right'); break;
+    case ' ': send('stop'); break;
+  }
+});
+
+document.addEventListener('keyup', (event) => {
+  switch (event.key.toLowerCase()) {
+    case 'w': case 'a': case 's': case 'd':
+      send('stop');
+      break;
+  }
+});
 </script>
 </body>
 </html>
